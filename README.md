@@ -3,7 +3,7 @@
 A demonstration application showcasing Query RAG (Retrieval-Augmented Generation) capabilities with AI-powered SQL query generation. This application allows users to upload CSV files, automatically analyze their contents, and use natural language to query the data through an AI workflow.
 
 [![Learn about Query RAG](https://img.youtube.com/vi/5LIfSpr3GDM/maxresdefault.jpg)](https://youtu.be/5LIfSpr3GDM)
-> 🎥 Learn about Query RAG and how it works!
+> 🎥 How to build advanced RAG systems with AI-generated SQL
 
 ## Features
 
@@ -16,9 +16,9 @@ A demonstration application showcasing Query RAG (Retrieval-Augmented Generation
 
 ## Architecture
 
-The application consists of two main components:
-
 ![AI SQL Query Generator Architecture](./architecture.png)
+
+The application consists of two main components:
 
 ### Frontend (`ui/src/App.tsx`)
 - React-based UI utilizing TypeScript and shadcn/ui components
