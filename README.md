@@ -2,7 +2,7 @@
 
 A demonstration application showcasing Query RAG (Retrieval-Augmented Generation) capabilities with AI-powered SQL query generation. This application allows users to upload CSV files, automatically analyze their contents, and use natural language to query the data through an AI workflow.
 
-[![Learn about Query RAG](https://img.youtube.com/vi/YOUTUBE_VIDEO_ID/maxresdefault.jpg)](https://youtu.be/YOUTUBE_VIDEO_ID)
+[![Learn about Query RAG](https://img.youtube.com/vi/5LIfSpr3GDM/maxresdefault.jpg)](https://youtu.be/5LIfSpr3GDM)
 > 🎥 Learn about Query RAG and how it works!
 
 ## Features
