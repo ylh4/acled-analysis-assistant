@@ -114,10 +114,6 @@ You can ask questions like:
 
 Contributions are welcome! Please read our contributing guidelines before submitting pull requests.
 
-## License
-
-[Your chosen license]
-
 ## Acknowledgments
 
 - ACLED for providing the conflict data
