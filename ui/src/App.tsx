@@ -1,76 +1,52 @@
-import { useState, useCallback } from 'react'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 
 function App() {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [tableName, setTableName] = useState('');
   const [query, setQuery] = useState('');
   const [queryResponse, setQueryResponse] = useState<string | null>(null);
   const [isQuerying, setIsQuerying] = useState(false);
-
-  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile?.type === "text/csv") {
-      setFile(droppedFile);
-    }
-  }, []);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile?.type === "text/csv") {
-      setFile(selectedFile);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file || !tableName) return;
-
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('tableName', tableName);
-
-    try {
-      const response = await fetch('http://localhost:3000/upload-csv', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error('Upload failed');
-      
-      setFile(null);
-      setTableName('');
-    } catch (error) {
-      console.error('Upload error:', error);
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleQuery = async () => {
     if (!query) return;
     
     setIsQuerying(true);
     try {
-      const response = await fetch('http://localhost:3000/query', {
+      console.log('Sending query:', query);
+
+      const response = await fetch('http://localhost:3000/api/ask', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: query }),
+        body: JSON.stringify({ question: query }),
       });
 
-      if (!response.ok) throw new Error('Query failed');
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Query failed: ${errorText}`);
+      }
       
       const data = await response.json();
-      setQueryResponse(data.response);
+      console.log('Response data:', data);
+      
+      if (data.success) {
+        let responseText = data.answer || '';
+        if (data.sql) {
+          responseText += '\n\nSQL Query:\n' + data.sql;
+        }
+        setQueryResponse(responseText);
+      } else {
+        setQueryResponse(`Error: ${data.error}`);
+      }
     } catch (error) {
       console.error('Query error:', error);
+      setQueryResponse(`Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
     } finally {
       setIsQuerying(false);
     }
@@ -79,60 +55,62 @@ function App() {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="flex gap-4 max-w-7xl mx-auto">
-        {/* Left Column - CSV Upload (1/3) */}
-        <Card className="w-1/3">
+        {/* Left Column - Instructions */}
+        <Card className="w-1/2">
           <CardHeader>
-            <CardTitle>Upload CSV File</CardTitle>
+            <CardTitle>How to Query ACLED Data</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <Label htmlFor="table-name">Table Name</Label>
-              <input
-                type="text"
-                id="table-name"
-                value={tableName}
-                onChange={(e) => setTableName(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md"
-                placeholder="Enter table name"
-              />
+          <CardContent className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Available Columns (Include these in your questions):</h3>
+              <ul className="list-disc pl-4 space-y-1 text-sm">
+                <li><span className="font-mono">event_type</span>: Type of conflict event</li>
+                <li><span className="font-mono">actor1</span>: Primary actor involved</li>
+                <li><span className="font-mono">assoc_actor_1</span>: Actor associated with actor1</li>
+                <li><span className="font-mono">actor2</span>: Secondary actor involved</li>
+                <li><span className="font-mono">assoc_actor_2</span>: Actor associated with actor2</li>
+                <li><span className="font-mono">region</span>: Geographic region</li>
+                <li><span className="font-mono">country</span>: Country of event</li>
+                <li><span className="font-mono">admin1</span>: First administrative division</li>
+                <li><span className="font-mono">admin2</span>: Second administrative division</li>
+                <li><span className="font-mono">admin3</span>: Third administrative division</li>
+                <li><span className="font-mono">location</span>: Specific location</li>
+                <li><span className="font-mono">latitude</span>: Geographic latitude</li>
+                <li><span className="font-mono">longitude</span>: Geographic longitude</li>
+                <li><span className="font-mono">fatalities</span>: Number of reported fatalities</li>
+                <li><span className="font-mono">notes</span>: Additional event details</li>
+                <li><span className="font-mono">source</span>: Information source</li>
+                <li><span className="font-mono">tags</span>: Event tags</li>
+              </ul>
             </div>
-            
-            <div
-              onDrop={onDrop}
-              onDragOver={(e) => e.preventDefault()}
-              className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary cursor-pointer"
-              onClick={() => document.getElementById('file-upload')?.click()}
-            >
-              <input
-                type="file"
-                id="file-upload"
-                className="hidden"
-                accept=".csv"
-                onChange={handleFileSelect}
-              />
-              <Label className="cursor-pointer block">
-                {file ? file.name : 'Drag and drop a CSV file here, or click to select'}
-              </Label>
+
+            <div>
+              <h3 className="font-semibold mb-2">Sample Questions:</h3>
+              <ul className="list-disc pl-4 space-y-1 text-sm">
+                <li>"Using the event_type column, what are the different types of events recorded?"</li>
+                <li>"Using the country, region, and fatalities columns, what are the top 5 regions with the highest fatalities?"</li>
+                <li>"Using the actor1, assoc_actor_1, and event_type columns, show events where military forces were involved as primary actors"</li>
+                <li>"Using the location, latitude, and longitude columns, list all events in capital cities"</li>
+                <li>"Using the admin1, admin2, and fatalities columns, which administrative regions had the most civilian casualties?"</li>
+              </ul>
+            </div>
+
+            <div className="bg-muted p-4 rounded-md mt-4">
+              <h3 className="font-semibold mb-2">Example of a Complex Query:</h3>
+              <p className="text-sm">
+                "Using the event_type, sub_event_type, actor1, region, country, and fatalities columns, show me the breakdown of violence types and casualties in East Africa where government forces were involved"
+              </p>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button 
-              onClick={handleUpload} 
-              disabled={!file || !tableName || uploading}
-              className="w-full"
-            >
-              {uploading ? 'Uploading...' : 'Upload CSV'}
-            </Button>
-          </CardFooter>
         </Card>
 
-        {/* Right Column - Query Interface (2/3) */}
-        <Card className="w-2/3">
+        {/* Right Column - Query Interface */}
+        <Card className="w-1/2">
           <CardHeader>
-            <CardTitle>Query Your Data</CardTitle>
+            <CardTitle>ACLED Data Query Interface</CardTitle>
           </CardHeader>
           <CardContent>
-            <Label htmlFor="query">Ask about your data</Label>
+            <Label htmlFor="query">Ask about the Armed Conflict Location & Event Data (ACLED)</Label>
             <div className="flex gap-2">
               <input
                 type="text"

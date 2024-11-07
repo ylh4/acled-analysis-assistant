@@ -1,142 +1,132 @@
-# AI SQL Query Generator
+# ACLED Data Analysis Assistant
 
-A demonstration application showcasing Query RAG (Retrieval-Augmented Generation) capabilities with AI-powered SQL query generation. This application allows users to upload CSV files, automatically analyze their contents, and use natural language to query the data through an AI workflow.
+An interactive application dedicated to analyzing Armed Conflict Location & Event Data Project (ACLED) data, providing insights about recent conflict trends through natural language queries.
 
-[![Learn about Query RAG](https://img.youtube.com/vi/5LIfSpr3GDM/maxresdefault.jpg)](https://youtu.be/5LIfSpr3GDM)
-> 🎥 How to build advanced RAG systems with AI-generated SQL
+## Overview
+
+This application serves as an AI-powered interface to the ACLED database, allowing users to:
+- Query conflict data using natural language
+- Analyze recent conflict trends and patterns
+- Get detailed insights about specific regions or event types
+- Visualize ACLED data through structured responses
 
 ## Features
 
-- 📤 CSV file upload with drag-and-drop support
-- 📊 Automatic schema detection and PostgreSQL table creation
-- 🤖 AI-powered natural language to SQL conversion
-- 🔍 Smart query analysis and validation
-- 💡 Intelligent error handling and query regeneration
-- 🎯 Context-aware responses based on available data
+- **Natural Language Processing**: Ask questions about conflict data in plain English
+- **Real-time Data Access**: Connected to ACLED's API for up-to-date conflict information
+- **Intelligent Query Processing**: AI-powered system that:
+  - Understands complex questions about conflict data
+  - Generates appropriate SQL queries
+  - Provides formatted, human-readable responses
+  - Handles both specific data questions and general inquiries
 
-## Architecture
+## Example Queries
 
-![AI SQL Query Generator Architecture](./architecture.png)
+You can ask questions like:
+- "Using the event_type column, what are the different types of events recorded?"
+- "Using the country, region, and fatalities columns, what are the top 5 regions with the highest fatalities?"
+- "Using the actor1, assoc_actor_1, and event_type columns, show events where military forces were involved as primary actors"
+- "Using the location, latitude, and longitude columns, list all events in capital cities"
+- "Using the admin1, admin2, and fatalities columns, which administrative regions had the most civilian casualties?"
 
-The application consists of two main components:
+## Local Development Setup
 
-### Frontend (`ui/src/App.tsx`)
-- React-based UI utilizing TypeScript and shadcn/ui components
-- Enables users to upload CSV files and query the data using natural language
+### Prerequisites
 
-### Backend (`server/src`)
-- Express.js server with TypeScript
-- PostgreSQL database integration
-- Multi-step AI query processing pipeline:
-  1. Query triage and classification
-  2. Schema analysis and table profiling
-  3. SQL generation
-  4. Result formatting
-  5. Answer validation
+- Node.js (v14 or higher)
+- npm or yarn
+- SQLite
+- OpenAI API key
 
-### Table Analyzer (`server/src/tableAnalyzer.ts`)
-The table analyzer component performs intelligent data profiling:
-- Samples data from uploaded tables
-- Analyzes column types, distinct values, and null ratios
-- Generates statistical summaries (min/max for numeric/dates)
-- Creates AI-powered descriptions of each field
-- Provides context for more accurate query generation
+### Installation Steps
 
-## Setup
-
-1. Install dependencies:
-
-# Frontend
-```
-cd ui
-npm install
-```
-
-# Backend
-1. Install dependencies:
-```
-cd server
-npm install
-```
-
-2. Set up your PostgreSQL database and configure environment variables:
-   Copy the `.env.sample` file to `.env` and update the values:
-
-```env
-DB_USER=postgres
-DB_HOST=localhost
-DB_NAME=sqlgen
-DB_PASSWORD=admin
-DB_PORT=5432
-PORT=3000
-OPENAI_API_KEY=your_openai_api_key
-```
-
-3. Start the development servers:
-
-# Frontend
-```
-cd ui
-npm run dev
-```
-
-# Backend
-```
-cd server
-npm run dev
-```
-
-## How It Works
-
-1. **CSV Upload**
-   - Upload a CSV file through drag-and-drop or file selection
-   - The server automatically detects column types and creates a PostgreSQL table
-   - Table schema is analyzed and stored for future queries
-
-2. **Query Processing**
-   - User enters a natural language question
-   - Query is classified as general, data-specific, or out-of-scope
-   - For data queries:
-     - Available schema is analyzed for relevance
-     - SQL query is generated using AI
-     - Results are formatted into natural language
-     - Response is validated for accuracy
-
-3. **Error Handling**
-   - Multiple retry attempts for failed queries
-   - Context-aware error messages
-   - Query regeneration with previous error context
-
-## Example Usage
-
-1. Upload a CSV file:
-   ```
-   Drag and drop your CSV file into the upload area
-   Enter a table name for your data
-   Click "Upload CSV"
+1. **Clone the repository**
+   ```bash
+   git clone [repository-url]
+   cd acled-analysis-assistant
    ```
 
-2. Query your data:
+2. **Set up environment variables**
+   Create a `.env` file in the server directory:
    ```
-   "Show me the total sales by region for last month"
-   "What was the average order value per customer?"
-   "Which products had the highest growth rate?"
+   PORT=3000
+   OPENAI_API_KEY=your_api_key_here
+   ACLED_API_KEY=your_acled_api_key
+   ACLED_EMAIL=your_registered_email
    ```
 
-## Technical Details
+3. **Install dependencies**
+   ```bash
+   # Install server dependencies
+   cd server
+   npm install
 
-The application uses a sophisticated prompt engineering approach to generate accurate SQL queries:
+   # Install client dependencies
+   cd ../client
+   npm install
+   ```
 
-- Query classification to determine appropriate response type
-- Schema analysis to identify relevant tables and relationships
-- PostgreSQL-specific query generation with best practices
-- Multi-step validation to ensure accurate responses
-- Error recovery with context-aware query regeneration
+4. **Initialize the database**
+   ```bash
+   cd server
+   npm run init-db
+   ```
+
+5. **Start the development servers**
+   ```bash
+   # Start the backend server
+   cd server
+   npm run dev
+
+   # In a new terminal, start the frontend
+   cd client
+   npm run dev
+   ```
+
+6. **Access the application**
+   Open your browser and navigate to `http://localhost:3000`
+
+## Usage Guidelines
+
+1. **Enter your question** in the input field using natural language
+2. **Wait for processing** as the system analyzes your query
+3. **Review the response** which includes:
+   - A natural language answer
+   - Relevant data points
+   - SQL query used (if applicable)
+   - Any visualizations or structured data
+
+## Technical Architecture
+
+- **Frontend**: React with TypeScript
+- **Backend**: Node.js/Express
+- **Database**: SQLite
+- **AI Processing**: OpenAI API
+- **Data Source**: ACLED API
+
+## API Rate Limits
+
+- ACLED API has specific rate limits for data fetching
+- Ensure compliance with ACLED's terms of service
+- Consider implementing caching for frequently requested data
 
 ## Contributing
 
-This is a proof of concept and is not intended for production use. This repository is for educational purposes and will not be maintained. Please feel free to fork and maintain your own version!
+Contributions are welcome! Please read our contributing guidelines before submitting pull requests.
 
 ## License
 
-MIT License - feel free to use this code for your own projects!
+[Your chosen license]
+
+## Acknowledgments
+
+- ACLED for providing the conflict data
+- OpenAI for the language processing capabilities
+
+## Support
+
+For issues, questions, or contributions, please open an issue in the GitHub repository.
+
+---
+
+**Note**: This application is for research and analytical purposes only. Always verify critical information through official ACLED channels.

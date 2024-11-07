@@ -36,10 +36,10 @@ export async function processQuery(message: string): Promise<QueryResponse> {
       
     case 'DATA_QUESTION':
       console.log('🔍 Processing data question');
-      // Step 3: Get schema information
-      const schemaResult = await query('SELECT table_name, analysis FROM TABLE_SCHEMA');
+      // Step 3: Get schema information - Updated for SQLite
+      const schemaResult = await query('SELECT * FROM TABLE_SCHEMA');
       console.log('📊 Step 3 - Schema query result:', schemaResult);
-      const tables = schemaResult.rows.map(row => ({
+      const tables = schemaResult.map(row => ({
         tableName: row.table_name,
         analysis: row.analysis
       }));
@@ -81,12 +81,12 @@ export async function processQuery(message: string): Promise<QueryResponse> {
           sqlQuery = JSON.parse(sqlResponse).query;
           console.log('📝 Step 5 - Final SQL query:', sqlQuery);
           
-          // Execute the SQL query
+          // Execute the SQL query - Updated for SQLite
           queryResults = await query(sqlQuery);
           console.log('⚡ Step 6 - Query results:', queryResults);
           
-          // Format the response
-          const formatPrompt = prompts.formatAnswer(message, sqlQuery, queryResults.rows);
+          // Format the response - Updated for SQLite
+          const formatPrompt = prompts.formatAnswer(message, sqlQuery, queryResults);
           const formattedResponse = await queryAI(formatPrompt.system, formatPrompt.user, true);
           const formattedResult = JSON.parse(formattedResponse) as { answer: string; highlights: string[]; caveats: string[] };
           

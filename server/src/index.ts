@@ -1,144 +1,74 @@
 import "dotenv/config";
 import express from 'express';
-import multer from 'multer';
 import cors from 'cors';
-import { query, initializeTables } from './db';
-import { parse } from 'csv-parse';
-import { createReadStream } from 'fs';
-import { analyzeTable } from './tableAnalyzer';
+import { query, initializeTables, fetchAndStoreApiData } from './db';
 import { processQuery } from './process-query';
+import { queryAI } from './query-ai';
+import { prompts } from './prompt-templates';
+import path from 'path';
 
-// Helper functions
-function isValidDate(value: string): boolean {
-  const date = new Date(value);
-  return date instanceof Date && !isNaN(date.getTime()) && 
-         (value.includes('-') || value.includes('/'));
+interface TriageResponse {
+  queryType: 'DATA_QUESTION' | 'GENERAL_QUESTION' | 'OUT_OF_SCOPE';
 }
 
-function guessSqlType(value: any): string {
-  if (value === null || value === undefined) return 'TEXT';
-  if (typeof value === 'string' && isValidDate(value)) return 'TIMESTAMP';
-  if (!isNaN(value) && value.toString().includes('.')) return 'NUMERIC';
-  if (!isNaN(value)) return 'INTEGER';
-  return 'TEXT';
-}
-
-function normalizeColumnName(column: string): string {
-  const reservedKeywords = ['user', 'group', 'order', 'select', 'where', 'from', 'table', 'column'];
-//   console.log(column);
-  let normalized = column.trim()
-    .toLowerCase()
-    .replace(/[^a-zA-Z0-9]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '')
-    
-  // If it's a reserved keyword, append '1'
-  if (reservedKeywords.includes(normalized.toLowerCase())) {
-    normalized += '1';
-  }
-  
-  return normalized;
+interface SchemaAnalysisResponse {
+  inScope: boolean;
+  outOfScopeReason?: string;
+  relevantTables: {
+    tableName: string;
+    fields: string[];
+    reason: string;
+  }[];
+  relationships: string[];
 }
 
 async function startServer() {
-  // Initialize database tables
   await initializeTables();
 
   const app = express();
   app.use(cors());
-  const upload = multer({ dest: 'uploads/' });
+  app.use(express.json());
 
-  app.post('/upload-csv', upload.single('file'), async (req, res) => {
+  // Static file serving
+  const clientPath = path.join(__dirname, '../../client');
+  app.use(express.static(clientPath));
+
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(clientPath, 'index.html'));
+  });
+
+  // Initialize ACLED data
+  const initializeData = async () => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
-
-      const tableName = req.body.tableName;
-      if (!tableName) {
-        return res.status(400).json({ error: 'Table name is required' });
-      }
-
-      const csvStream = createReadStream(req.file.path);
-      const parser = parse({
-        columns: true,
-        skip_empty_lines: true
-      });
-
-      // Collect first 10 rows to analyze column types
-      const sampleRows: any[] = [];
-      const columnTypes = new Map<string, string>();
-      
-      for await (const record of csvStream.pipe(parser)) {
-        sampleRows.push(record);
-        if (sampleRows.length === 10) break;
-      }
-
-      if (sampleRows.length === 0) {
-        return res.status(400).json({ error: 'CSV file is empty' });
-      }
-
-      // Determine column types from sample data
-      const columns = Object.keys(sampleRows[0]).map(normalizeColumnName);
-      columns.forEach((column, index) => {
-        const originalColumn = Object.keys(sampleRows[0])[index];
-        const values = sampleRows.map(row => row[originalColumn]).filter(v => v !== null && v !== '');
-        columnTypes.set(column, guessSqlType(values[0]));
-      });
-
-      // Drop existing table if it exists
-      await query(`DROP TABLE IF EXISTS ${tableName}`);
-
-      // Create new table
-      const createTableSQL = `
-        CREATE TABLE ${tableName} (
-          ${columns.map(column => `${column} ${columnTypes.get(column)}`).join(',\n')}
-        )
-      `;
-      console.log(createTableSQL);
-      await query(createTableSQL);
-
-      // Reset stream for full import
-      const insertStream = createReadStream(req.file.path);
-      const insertParser = insertStream.pipe(parse({
-        columns: true,
-        skip_empty_lines: true
-      }));
-
-      // Insert all records
-      for await (const record of insertParser) {
-        const originalColumns = Object.keys(record);
-        const insertSQL = `
-          INSERT INTO ${tableName} (${columns.map(c => `"${c}"`).join(', ')})
-          VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')})
-        `;
-        await query(insertSQL, originalColumns.map(c => record[c]));
-      }
-
-      // After successful upload, analyze the table and store the results
-      const analysis = await analyzeTable(tableName);
-      
-      // Store the analysis in TABLE_SCHEMA
-      await query(
-        `INSERT INTO TABLE_SCHEMA (table_name, analysis)
-         VALUES ($1, $2)
-         ON CONFLICT (table_name) 
-         DO UPDATE SET 
-           analysis = $2,
-           updated_at = CURRENT_TIMESTAMP`,
-        [tableName, analysis]
-      );
-
-      res.json({ 
-        message: 'CSV data successfully imported to database',
-        tableName,
-        columnCount: columns.length,
-        columnTypes: Object.fromEntries(columnTypes),
-        analysis
-      });
+      await fetchAndStoreApiData('https://api.acleddata.com/acled/read/?key=AZWhjxyhAUb3eHhVL3rQ&email=yared.hurisa@unchealth.unc.edu&LIMIT=100');
+      console.log('API data successfully loaded');
     } catch (error) {
-      console.error('Error processing CSV:', error);
-      res.status(500).json({ error: 'Failed to process CSV file' });
+      console.error('Failed to load initial data:', error);
+    }
+  };
+
+  initializeData();
+
+  app.get('/api/acled-data', async (req, res) => {
+    try {
+      const data = await query('SELECT * FROM acled_data');
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('Error fetching ACLED data:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch ACLED data' });
+    }
+  });
+
+  app.get('/api/tables', async (req, res) => {
+    try {
+      const tables = await query(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name NOT LIKE 'sqlite_%'
+      `);
+      res.json({ success: true, tables });
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch tables' });
     }
   });
 
@@ -146,13 +76,85 @@ async function startServer() {
     try {
       const { message } = req.body;
       
-      // Process the query using our new function
-      const result = await processQuery(message);
-      
-      res.json(result);
+      // Get table schema
+      const tables = await query('SELECT * FROM sqlite_master WHERE type="table"');
+      const schemaContext = {
+        tables: await Promise.all(tables.map(async (table) => ({
+          tableName: table.name,
+          analysis: await query(`PRAGMA table_info(${table.name})`)
+        })))
+      };
+
+      // Analyze question
+      const triageResponse = JSON.parse(await queryAI(
+        prompts.triage(message).system,
+        prompts.triage(message).user,
+        true
+      )) as TriageResponse;
+
+      if (triageResponse.queryType === 'DATA_QUESTION') {
+        // Analyze schema
+        const schemaAnalysis = JSON.parse(await queryAI(
+          prompts.schemaAnalysis(schemaContext, message).system,
+          prompts.schemaAnalysis(schemaContext, message).user,
+          true
+        )) as SchemaAnalysisResponse;
+
+        if (schemaAnalysis.inScope) {
+          // Generate SQL
+          const sqlResponse = JSON.parse(await queryAI(
+            prompts.generateSQL(schemaAnalysis, message).system,
+            prompts.generateSQL(schemaAnalysis, message).user,
+            true
+          ));
+
+          console.log('Generated SQL:', sqlResponse.query); // Add this for debugging
+
+          // Execute query
+          const results = await query(sqlResponse.query);
+
+          // Format answer
+          const formattedResponse = JSON.parse(await queryAI(
+            prompts.formatAnswer(message, sqlResponse.query, results).system,
+            prompts.formatAnswer(message, sqlResponse.query, results).user,
+            true
+          ));
+
+          res.json({
+            success: true,
+            answer: formattedResponse.answer,
+            data: results,
+            sql: sqlResponse.query
+          });
+        } else {
+          res.json({
+            success: false,
+            error: schemaAnalysis.outOfScopeReason
+          });
+        }
+      } else if (triageResponse.queryType === 'GENERAL_QUESTION') {
+        const generalResponse = JSON.parse(await queryAI(
+          prompts.generalAnswer(message).system,
+          prompts.generalAnswer(message).user,
+          true
+        ));
+        res.json({
+          success: true,
+          answer: generalResponse.answer
+        });
+      } else {
+        res.json({
+          success: false,
+          error: 'Question is out of scope'
+        });
+      }
     } catch (error) {
       console.error('Error processing query:', error);
-      res.status(500).json({ error: 'Failed to process query' });
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to process query',
+        details: error.message 
+      });
     }
   });
 
@@ -162,7 +164,6 @@ async function startServer() {
   });
 }
 
-// Start the server and handle any errors
 startServer().catch(error => {
   console.error('Failed to start server:', error);
   process.exit(1);

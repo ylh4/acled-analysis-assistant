@@ -51,13 +51,21 @@ Respond in JSON format matching this schema:
   }),
 
   schemaAnalysis: ({ tables }: SchemaContext, userQuery: string) => ({
-    system: `You are a database schema analyst.
-Analyze which tables and fields would be needed to answer the user's question.
-If the question cannot be answered with the available tables, respond with inScope set to false.
+    system: `You are a database schema analyst specializing in ACLED conflict data.
+Analyze which tables and fields would be needed to answer the user's question about conflict events.
+The main table 'acled_data' contains information about conflict events including:
+- event_date: When the event occurred
+- event_type: Type of conflict event
+- actor1: First actor involved
+- actor2: Second actor involved
+- location: Where the event took place
+- country: Country where event occurred
+- fatalities: Number of reported fatalities
+
+If the question cannot be answered with the available fields, respond with inScope set to false.
 If inScope is false, provide a reason in the outOfScopeReason field.
-If the answer can be answered with the available tables, respond with inScope set to true and
-list the relevant tables and fields in the relevantTables array.
-List any join keys and relationships in the relationships array with strings like "table1.id = table2.id".
+If the answer can be answered with the available fields, respond with inScope set to true and
+list the relevant fields needed to answer the question.
 Respond in JSON format matching this schema:
 {
   "inScope": boolean,
@@ -69,7 +77,7 @@ Respond in JSON format matching this schema:
       "reason": "string"
     }
   ],
-  "relationships": string[],
+  "relationships": string[]
 }`,
     user: `Available Schema:
 ${tables.map(t => `Table: ${t.tableName}\nSchema: ${JSON.stringify(t.analysis)}`).join('\n\n')}
@@ -78,17 +86,17 @@ Question: ${userQuery}`,
   }),
 
   generateSQL: (schemaContext: SchemaAnalysisResponse, userQuery: string) => ({
-    system: `You are a PostgreSQL query generator. Follow these rules:
-1. Generate precise, efficient PostgreSQL-compliant queries based on schema analysis.
+    system: `You are a SQLite query generator. Follow these rules:
+1. Generate precise, efficient SQLite-compliant queries based on schema analysis.
 2. When necessary, use the relationships array to join tables.
-3. Use "ILIKE" for case-insensitive pattern matching. For exact matches, use "="
-4. For partial string matches, use ILIKE with % wildcards (e.g., column ILIKE '%pattern%')
+3. Use "LIKE" for case-insensitive pattern matching (SQLite's LIKE is case-insensitive by default)
+4. For partial string matches, use LIKE with % wildcards (e.g., column LIKE '%pattern%')
 5. Use a maximum limit of 1000 whenever a limit is not specified.
 6. Always use the column names provided in the schema and never reference columns outside of that.
-7. Use PostgreSQL-specific features when appropriate:
-   - Use DISTINCT ON instead of GROUP BY when selecting unique rows
-   - Use STRING_AGG for string concatenation
-   - Use DATE_TRUNC for date/time operations
+7. Use SQLite-compatible features:
+   - Use GROUP BY instead of DISTINCT ON
+   - Use GROUP_CONCAT for string concatenation
+   - Use strftime for date/time operations
    - Use WITH for Common Table Expressions (CTEs)
 8. Make sure that the query fully answers the user's question.
 Respond in JSON format matching this schema:
@@ -131,17 +139,17 @@ Answer: ${answer}`,
   }),
 
   regenerateSQL: (schemaContext: SchemaAnalysisResponse, userQuery: string, previousQuery: string, error: string) => ({
-    system: `You are a PostgreSQL query generator. Follow these rules:
-1. Generate precise, efficient PostgreSQL-compliant queries based on schema analysis.
+    system: `You are a SQLite query generator. Follow these rules:
+1. Generate precise, efficient SQLite-compliant queries based on schema analysis.
 2. When necessary, use the relationships array to join tables.
-3. Use "ILIKE" for case-insensitive pattern matching. For exact matches, use "="
-4. For partial string matches, use ILIKE with % wildcards (e.g., column ILIKE '%pattern%')
+3. Use "LIKE" for case-insensitive pattern matching (SQLite's LIKE is case-insensitive by default)
+4. For partial string matches, use LIKE with % wildcards (e.g., column LIKE '%pattern%')
 5. Use a maximum limit of 1000 whenever a limit is not specified.
 6. Always use the column names provided in the schema and never reference columns outside of that.
-7. Use PostgreSQL-specific features when appropriate:
-   - Use DISTINCT ON instead of GROUP BY when selecting unique rows
-   - Use STRING_AGG for string concatenation
-   - Use DATE_TRUNC for date/time operations
+7. Use SQLite-compatible features:
+   - Use GROUP BY instead of DISTINCT ON
+   - Use GROUP_CONCAT for string concatenation
+   - Use strftime for date/time operations
    - Use WITH for Common Table Expressions (CTEs)
 8. Make sure that the query fully answers the user's question.
 9. Consider the previous query that failed and its error message to avoid similar issues.
