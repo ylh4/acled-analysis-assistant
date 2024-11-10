@@ -1,0 +1,13 @@
+prefix=/Users/yaredhurisa/Desktop/acled-analysis-assistant/acled
+exec_prefix=/Users/yaredhurisa/Desktop/acled-analysis-assistant/acled
+libdir=/Users/yaredhurisa/Desktop/acled-analysis-assistant/acled/lib
+sharedlibdir=/Users/yaredhurisa/Desktop/acled-analysis-assistant/acled/lib
+includedir=/Users/yaredhurisa/Desktop/acled-analysis-assistant/acled/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.2.13
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}

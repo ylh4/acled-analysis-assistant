@@ -16,12 +16,12 @@ function App() {
     try {
       console.log('Sending query:', query);
 
-      const response = await fetch('http://localhost:3000/api/ask', {
+      const response = await fetch('http://localhost:3000/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ question: query }),
+        body: JSON.stringify({ message: query }),
       });
 
       console.log('Response status:', response.status);

@@ -22,6 +22,18 @@ interface SchemaAnalysisResponse {
   relationships: string[];
 }
 
+interface ACLEDEvent {
+  data_id: number;
+  event_date: string;
+  // ... add other fields that match your database schema
+}
+
+interface APIResponse {
+  data: ACLEDEvent[];
+  count: number;
+  success: boolean;
+}
+
 async function startServer() {
   await initializeTables();
 
@@ -40,22 +52,77 @@ async function startServer() {
   // Initialize ACLED data
   const initializeData = async () => {
     try {
-      await fetchAndStoreApiData('https://api.acleddata.com/acled/read/?key=AZWhjxyhAUb3eHhVL3rQ&email=yared.hurisa@unchealth.unc.edu&LIMIT=100');
-      console.log('API data successfully loaded');
+      // First, check if we already have data
+      const existingCount = await query('SELECT COUNT(*) as count FROM acled_data');
+      const lastEvent = await query('SELECT MAX(data_id) as last_id FROM acled_data');
+      const lastEventId = lastEvent[0]?.last_id || 0;
+
+      // Calculate how many records to fetch (ACLED usually limits to 500 per request)
+      const PAGE_SIZE = 500;
+      const baseUrl = 'https://api.acleddata.com/acled/read/';
+      
+      const fetchPage = async (page: number): Promise<APIResponse> => {
+        const url = `${baseUrl}?key=${process.env.ACLED_API_KEY}&email=${process.env.ACLED_EMAIL}&limit=${PAGE_SIZE}&page=${page}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`API request failed: ${response.statusText}`);
+        }
+        return response.json();
+      };
+
+      // Fetch first page to get total count
+      const firstPage = await fetchPage(1);
+      const totalRecords = firstPage.count;
+      const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
+
+      console.log(`Total records available: ${totalRecords}`);
+      console.log(`Existing records: ${existingCount[0].count}`);
+
+      // If we have new data to fetch
+      if (existingCount[0].count < totalRecords) {
+        console.log('Fetching new records...');
+        
+        for (let page = 1; page <= totalPages; page++) {
+          const response = await fetchPage(page);
+          const newEvents = response.data.filter(event => event.data_id > lastEventId);
+          
+          if (newEvents.length > 0) {
+            // Insert new records
+            for (const event of newEvents) {
+              await query(`
+                INSERT OR IGNORE INTO acled_data 
+                (data_id, event_date, /* other fields */) 
+                VALUES (?, ?, /* other values */)
+              `, [event.data_id, event.event_date /* other values */]);
+            }
+            console.log(`Inserted ${newEvents.length} new records from page ${page}`);
+          }
+
+          // Add a small delay to avoid hitting rate limits
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } else {
+        console.log('Database is up to date');
+      }
+
+      console.log('ACLED data synchronization complete');
     } catch (error) {
-      console.error('Failed to load initial data:', error);
+      console.error('Failed to sync ACLED data:', 
+        error instanceof Error ? error.message : 'Unknown error');
     }
   };
-
-  initializeData();
 
   app.get('/api/acled-data', async (req, res) => {
     try {
       const data = await query('SELECT * FROM acled_data');
       res.json({ success: true, data });
     } catch (error) {
-      console.error('Error fetching ACLED data:', error);
-      res.status(500).json({ success: false, error: 'Failed to fetch ACLED data' });
+      console.error('Error fetching ACLED data:', 
+        error instanceof Error ? error.message : 'Unknown error');
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch ACLED data' 
+      });
     }
   });
 
@@ -153,10 +220,30 @@ async function startServer() {
       res.status(500).json({ 
         success: false, 
         error: 'Failed to process query',
-        details: error.message 
+        details: error instanceof Error ? error.message : 'An unknown error occurred'
       });
     }
   });
+
+  // Add a new endpoint to manually trigger updates
+  app.post('/api/update-acled', async (req, res) => {
+    try {
+      await initializeData();
+      res.json({ success: true, message: 'ACLED data update completed' });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to update ACLED data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Schedule updates every 24 hours
+  setInterval(async () => {
+    console.log('Running scheduled ACLED data update...');
+    await initializeData();
+  }, 24 * 60 * 60 * 1000);
 
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
